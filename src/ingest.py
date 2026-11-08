@@ -19,11 +19,11 @@ def require_env(name: str) -> str:
 
 def ingest_pdf():
     require_env("GOOGLE_API_KEY") # lida internamente pelo GoogleGenerativeAIEmbeddings
-    PDF_PATH = require_env("PDF_PATH")
-    COLLECTION_NAME = require_env("PG_VECTOR_COLLECTION_NAME")
-    DATABASE_URL = require_env("DATABASE_URL")
+    pdf_path = require_env("PDF_PATH")
+    collection_name = require_env("PG_VECTOR_COLLECTION_NAME")
+    database_url = require_env("DATABASE_URL")
 
-    docs = PyPDFLoader(PDF_PATH).load()
+    docs = PyPDFLoader(pdf_path).load()
     chunks = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=150,
@@ -37,23 +37,23 @@ def ingest_pdf():
         model=os.getenv("GOOGLE_EMBEDDING_MODEL", "models/gemini-embedding-001")
     )
 
-    BATCH_SIZE = 10
-    PAUSE_SECONDS = 10
+    batch_size = 10
+    pause_seconds = 10
 
     store = PGVector(
         embeddings=embeddings,
-        collection_name=COLLECTION_NAME,
-        connection=DATABASE_URL,
+        collection_name=collection_name,
+        connection=database_url,
         use_jsonb=True,
         pre_delete_collection=True,
     )
 
-    for i in range(0, len(chunks), BATCH_SIZE):
-        batch = chunks[i:i + BATCH_SIZE]
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
         store.add_documents(batch)
         print(f"{i + len(batch)}/{len(chunks)} chunks armazenados")
-        if i + BATCH_SIZE < len(chunks):
-            time.sleep(PAUSE_SECONDS)
+        if i + batch_size < len(chunks):
+            time.sleep(pause_seconds)
 
     print(f"Ingestão concluída: {len(chunks)} chunks armazenados")
 
