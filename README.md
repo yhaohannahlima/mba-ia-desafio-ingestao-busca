@@ -102,3 +102,40 @@ RESPOSTA: R$ 10.000.000,00.
 PERGUNTA: Quantos clientes temos em 2024?
 RESPOSTA: Não tenho informações necessárias para responder sua pergunta.
 ```
+
+## Como funciona
+
+**Ingestão (`ingest.py`)**
+
+1. Carrega o PDF com `PyPDFLoader`
+2. Divide o texto com `RecursiveCharacterTextSplitter` (`chunk_size=1000`, `chunk_overlap=150`)
+3. Gera os embeddings com `GoogleGenerativeAIEmbeddings`
+4. Armazena os vetores no pgVector com `PGVector`
+
+**Busca e resposta (`search.py`)**
+
+1. Vetoriza a pergunta com o mesmo modelo de embedding usado na ingestão
+2. Busca os 10 chunks mais semelhantes com `similarity_search_with_score(k=10)`
+3. Monta o prompt com os chunks como contexto e a pergunta do usuário
+4. O LLM responde seguindo as regras do prompt: usa apenas o contexto e, se a informação não estiver nele, responde com a mensagem padrão
+
+**Chat (`chat.py`)**: um loop no terminal que envia cada pergunta para a chain. Se uma pergunta falhar, por exemplo por limite da API, o erro é exibido e o chat continua.
+
+## Verificação no banco
+
+Para conferir quantos chunks foram armazenados:
+
+```bash
+docker exec postgres_rag psql -U postgres -d rag -c "SELECT COUNT(*) FROM langchain_pg_embedding;"
+```
+
+## Solução de problemas
+
+| Sintoma                                                                                              | Causa provável                                            | Solução                                                              |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------- |
+| `Environment variable X is not set`                                                                  | Variável ausente ou vazia no `.env`                       | Preencha a variável indicada                                         |
+| `A collection '...' não existe ou está vazia`                                                        | Nome da collection errado ou ingestão ainda não executada | Confira `PG_VECTOR_COLLECTION_NAME` e rode `python src/ingest.py`    |
+| `429 You exceeded your current quota` (ingestão) ou `Limite de uso da API do Gemini atingido` (chat) | Limite de tokens por minuto do plano gratuito             | Aguarde cerca de 1 minuto e tente novamente                          |
+| `404 ... is not found` ou `no longer available`                                                      | Modelo descontinuado pelo Google                          | Atualize `GOOGLE_EMBEDDING_MODEL` ou `GOOGLE_LLM_MODEL` no `.env`    |
+| Erro de conexão com o banco ou `Não foi possível acessar o banco de dados` (chat)                    | Container parado                                          | Rode `docker compose up -d`                                          |
+| Traceback `AttributeError: 'NoneType' object has no attribute 'POLLER'` ao encerrar                  | Aviso conhecido do gRPC no encerramento do Python         | Pode ser ignorado: ocorre depois da execução e não afeta o resultado |
