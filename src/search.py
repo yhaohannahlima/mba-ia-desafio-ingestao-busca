@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_postgres import PGVector
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 
 PROMPT_TEMPLATE = """
 CONTEXTO:
@@ -42,6 +42,8 @@ def count_chunks(database_url: str, collection_name: str) -> int:
     engine = create_engine(database_url)
     try:
         with engine.connect() as conn:
+            if not inspect(conn).has_table("langchain_pg_collection"):
+                return 0
             return conn.execute(
                 text("""
                     SELECT COUNT(e.id)
